@@ -25,7 +25,7 @@ class XMeans(KMeans):
                 self.cluster_centers_.append(km.cluster_centers_[1])
                 km.labels_[km.labels_ == 1] += splits
                 km.labels_[km.labels_ == 0] += label
-                labels[labels == label], splits = self.__recrucive_clustering(cluster, km.labels_, [label, splits], splits+1)
+                labels[labels == label], splits = self.__recrucive_clustering(cluster, km.labels_, [label, splits+1], splits+1)
         return labels, splits
 
     def __recrucive_decision(self, cluster, labels, centers):
@@ -45,10 +45,13 @@ class XMeans(KMeans):
     def __model_likelihood(self, cluster_0, cluster_1):
         mu_0, mu_1 = np.mean(cluster_0, axis=0), np.mean(cluster_1, axis=0)
         sigma_0, sigma_1 = np.cov(cluster_0.T) , np.cov(cluster_1.T)
-        beta = np.linalg.norm(mu_0 - mu_1) / np.sqrt(np.linalg.det(sigma_0) + np.linalg.det(sigma_1))
+        det_0 = np.linalg.det(sigma_0) if len(cluster_0) > 1 else 0.0
+        det_1 = np.linalg.det(sigma_1) if len(cluster_1) > 1 else 0.0
+        beta = np.linalg.norm(mu_0 - mu_1) / np.sqrt(det_0 + det_1)
         return 0.5 / stats.norm.cdf(beta)
 
     def __log_likelihood(self, cluster):
+        if len(cluster) == 1: return np.log(1.0)
         mu = np.mean(cluster, axis=0)
         sigma = np.cov(cluster.T)
         try:
@@ -56,8 +59,6 @@ class XMeans(KMeans):
         except np.linalg.LinAlgError as err:
             sigma = sigma * np.identity(sigma.shape[0])
             log_likehood = np.sum(stats.multivariate_normal.logpdf(x, mu, sigma) for x in cluster)
-        except ValueError as err:
-            log_likehood = np.log(1.0)
         return log_likehood
 
     def predict(self):
